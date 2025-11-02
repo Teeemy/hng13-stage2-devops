@@ -10,15 +10,15 @@ on:
       blue_image:
         description: 'Blue pool Docker image'
         required: false
-        default: 'teemy01/ppe:latest'
+        default: 'teemy01/hng-node-app:latest'
       green_image:
         description: 'Green pool Docker image'
         required: false
-        default: 'teemy01/ppe:latest'
+        default: 'teemy01/hng-node-app:latest'
 
 env:
-  BLUE_IMAGE: ${{ github.event.inputs.blue_image || 'teemy01/ppe:latest' }}
-  GREEN_IMAGE: ${{ github.event.inputs.green_image || 'teemy01/ppe:latest' }}
+  BLUE_IMAGE: ${{ github.event.inputs.blue_image || 'teemy01/hng-node-app:latest' }}
+  GREEN_IMAGE: ${{ github.event.inputs.green_image || 'teemy01/hng-node-app:latest' }}
   ACTIVE_POOL: blue
   RELEASE_ID_BLUE: v1.0.0-blue
   RELEASE_ID_GREEN: v1.0.0-green
@@ -98,8 +98,8 @@ jobs:
       
       - name: Run verification script
         run: |
-          chmod +x reload-nginx.sh
-          ./reload-nginx.sh --test
+          chmod +x reload_nginx.sh
+          ./reload_nginx.sh --test
       
       - name: Test direct access to Blue pool
         run: |
