@@ -7,9 +7,9 @@
 - [x] `.env` - Environment configuration (use as template)
 - [x] `.env.example` - Template for environment variables
 - [x] `nginx.conf` - Nginx reverse proxy configuration
-- [x] `reload-nginx.sh` - Deployment and testing script
+- [x] `reload_nginx.sh` - Deployment and testing script
 - [x] `README.md` - Complete documentation
-- [x] `.github/workflows/blue-green-test.yml` - CI/CD pipeline
+- [x] `.github/workflows/blue-green.yml` - CI/CD pipeline
 
 ### Functionality Checklist
 
@@ -58,14 +58,14 @@ curl http://localhost:8080/version
 # Should show: X-App-Pool: blue
 
 # 3. Trigger chaos on Blue
-curl -X POST http://localhost:8081/chaos/start?mode=error
+ curl -X POST -s -w "\n%{http_code}" "$CHAOS_URL/chaos/start?mode=error"
 
 # 4. Verify failover to Green
 curl http://localhost:8080/version
 # Should show: X-App-Pool: green
 
 # 5. Run automated test
-./reload-nginx.sh --test
+./reload_nginx.sh --test
 
 # 6. Stop chaos
 curl -X POST http://localhost:8081/chaos/stop
@@ -126,7 +126,7 @@ hng13-stage2-devops/
 ## Submission Checklist
 
 ### Before Submitting
-- [ ] Test locally: `./reload-nginx.sh --test`
+- [ ] Test locally: `./reload_nginx.sh --test`
 - [ ] Verify GitHub Actions passes
 - [ ] Check all files are committed
 - [ ] Review README for completeness
