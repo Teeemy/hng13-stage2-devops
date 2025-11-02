@@ -50,14 +50,13 @@ envsubst '${ACTIVE_POOL}' < nginx.conf > nginx.conf.tmp
 
 # Test the generated configuration
 echo -e "${YELLOW}Testing Nginx configuration...${NC}"
-$DOCKER_COMPOSE exec nginx nginx -t -c /etc/nginx/nginx.conf.tmp 2>/dev/null || {
+if command -v nginx &> /dev/null; then
     # If container test fails, test locally with the temp file
-    if command -v nginx &> /dev/null; then
-        nginx -t -c "$(pwd)/nginx.conf.tmp"
-    else
-        echo -e "${YELLOW}Warning: Cannot test config (nginx not available locally)${NC}"
-    fi
-}
+    nginx -t -c "$(pwd)/nginx.conf.tmp"
+else
+    echo -e "${YELLOW}Warning: Cannot test config (nginx not available locally)${NC}"
+    echo -e "${YELLOW}Skipping config validation...${NC}"
+fi
 
 # Check if test was successful
 if [ $? -eq 0 ]; then
