@@ -12,7 +12,7 @@ services:
       green:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://blue:8080/healthz"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://blue:80/healthz"]
       interval: 10s
       timeout: 5s
       retries: 3
