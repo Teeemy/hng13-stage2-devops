@@ -2,7 +2,7 @@ name: Blue-Green Deployment Test
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feat ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -55,15 +55,6 @@ jobs:
           echo "Generated .env file:"
           cat .env
       
-      - name: Generate Nginx configuration
-        run: |
-          if [ -f nginx.conf.template ]; then
-            envsubst '${ACTIVE_POOL}' < nginx.conf.template > nginx.conf
-          fi
-          
-          echo "Nginx configuration:"
-          cat nginx.conf
-      
       - name: Pull Docker images
         run: |
           docker pull ${{ env.BLUE_IMAGE }}
@@ -73,7 +64,7 @@ jobs:
         run: |
           docker compose up -d
           echo "Waiting for services to be healthy..."
-          sleep 10
+          sleep 15
       
       - name: Check service health
         run: |
@@ -85,21 +76,6 @@ jobs:
             docker compose logs
             exit 1
           fi
-      
-      - name: Display service logs
-        if: always()
-        run: |
-          echo "=== Nginx logs ==="
-          docker compose logs nginx
-          echo "=== Blue logs ==="
-          docker compose logs blue
-          echo "=== Green logs ==="
-          docker compose logs green
-      
-      - name: Run verification script
-        run: |
-          chmod +x reload_nginx.sh
-          ./reload_nginx.sh --test
       
       - name: Test direct access to Blue pool
         run: |
@@ -115,6 +91,28 @@ jobs:
         run: |
           echo "Testing Nginx proxy..."
           curl -f http://localhost:${{ env.NGINX_PORT }}/version || exit 1
+      
+      - name: Run failover verification test
+        run: |
+          chmod +x reload_nginx.sh
+          ./reload_nginx.sh --test
+      
+      - name: Stop chaos after test
+        if: always()
+        run: |
+          echo "Stopping chaos on both pools..."
+          curl -X POST http://localhost:${{ env.BLUE_PORT }}/chaos/stop || true
+          curl -X POST http://localhost:${{ env.GREEN_PORT }}/chaos/stop || true
+      
+      - name: Display service logs
+        if: always()
+        run: |
+          echo "=== Nginx logs ==="
+          docker compose logs nginx
+          echo "=== Blue logs ==="
+          docker compose logs blue
+          echo "=== Green logs ==="
+          docker compose logs green
       
       - name: Capture logs on failure
         if: failure()
