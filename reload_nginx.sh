@@ -33,6 +33,22 @@ set -a
 source .env
 set +a
 
+if [ "$CI" == "true" ]; then
+    echo -e "${YELLOW}CI environment detected — skipping Nginx config validation${NC}"
+    config_test_passed=true
+else
+    config_test_passed=false
+    if command -v nginx &> /dev/null; then
+        if nginx -t -c "$(pwd)/nginx.conf.tmp" 2>&1; then
+            config_test_passed=true
+        fi
+    else
+        echo -e "${YELLOW}Warning: Cannot test config (nginx not available locally)${NC}"
+        config_test_passed=true
+    fi
+fi
+
+
 # Validate ACTIVE_POOL is set
 if [ -z "$ACTIVE_POOL" ]; then
     echo -e "${RED}Error: ACTIVE_POOL not set in .env${NC}"
