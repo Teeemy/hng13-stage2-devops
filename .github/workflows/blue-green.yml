@@ -1,0 +1,144 @@
+name: Blue-Green Deployment Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      blue_image:
+        description: 'Blue pool Docker image'
+        required: false
+        default: 'teemy01/hng-node-app:latest'
+      green_image:
+        description: 'Green pool Docker image'
+        required: false
+        default: 'teemy01/hng-node-app:latest'
+
+env:
+  BLUE_IMAGE: ${{ github.event.inputs.blue_image || 'teemy01/hng-node-app:latest' }}
+  GREEN_IMAGE: ${{ github.event.inputs.green_image || 'teemy01/hng-node-app:latest' }}
+  ACTIVE_POOL: blue
+  RELEASE_ID_BLUE: v1.0.0-blue
+  RELEASE_ID_GREEN: v1.0.0-green
+  PORT: 8080
+  NGINX_PORT: 8080
+  BLUE_PORT: 8081
+  GREEN_PORT: 8082
+
+jobs:
+  test-blue-green-deployment:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          BLUE_IMAGE=${{ env.BLUE_IMAGE }}
+          GREEN_IMAGE=${{ env.GREEN_IMAGE }}
+          ACTIVE_POOL=${{ env.ACTIVE_POOL }}
+          RELEASE_ID_BLUE=${{ env.RELEASE_ID_BLUE }}
+          RELEASE_ID_GREEN=${{ env.RELEASE_ID_GREEN }}
+          PORT=${{ env.PORT }}
+          NGINX_PORT=${{ env.NGINX_PORT }}
+          BLUE_PORT=${{ env.BLUE_PORT }}
+          GREEN_PORT=${{ env.GREEN_PORT }}
+          EOF
+          
+          echo "Generated .env file:"
+          cat .env
+      
+      - name: Generate Nginx configuration
+        run: |
+          if [ -f nginx.conf.template ]; then
+            envsubst '${ACTIVE_POOL}' < nginx.conf.template > nginx.conf
+          fi
+          
+          echo "Nginx configuration:"
+          cat nginx.conf
+      
+      - name: Pull Docker images
+        run: |
+          docker pull ${{ env.BLUE_IMAGE }}
+          docker pull ${{ env.GREEN_IMAGE }}
+      
+      - name: Start Docker Compose stack
+        run: |
+          docker compose up -d
+          echo "Waiting for services to be healthy..."
+          sleep 10
+      
+      - name: Check service health
+        run: |
+          docker compose ps
+          
+          # Check if all services are running
+          if ! docker compose ps | grep -q "Up"; then
+            echo "ERROR: Services failed to start"
+            docker compose logs
+            exit 1
+          fi
+      
+      - name: Display service logs
+        if: always()
+        run: |
+          echo "=== Nginx logs ==="
+          docker compose logs nginx
+          echo "=== Blue logs ==="
+          docker compose logs blue
+          echo "=== Green logs ==="
+          docker compose logs green
+      
+      - name: Run verification script
+        run: |
+          chmod +x reload_nginx.sh
+          ./reload_nginx.sh --test
+      
+      - name: Test direct access to Blue pool
+        run: |
+          echo "Testing Blue pool directly..."
+          curl -f http://localhost:${{ env.BLUE_PORT }}/version || exit 1
+      
+      - name: Test direct access to Green pool
+        run: |
+          echo "Testing Green pool directly..."
+          curl -f http://localhost:${{ env.GREEN_PORT }}/version || exit 1
+      
+      - name: Test Nginx proxy
+        run: |
+          echo "Testing Nginx proxy..."
+          curl -f http://localhost:${{ env.NGINX_PORT }}/version || exit 1
+      
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          echo "=== Full Docker Compose logs ==="
+          docker compose logs --tail=100
+          
+          echo "=== Container status ==="
+          docker compose ps -a
+      
+      - name: Tear down Docker Compose stack
+        if: always()
+        run: |
+          echo "Stopping and removing containers..."
+          docker compose down -v
+          
+          echo "Cleanup complete"
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            .env
+            nginx.conf
+          retention-days: 7

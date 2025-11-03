@@ -1,0 +1,63 @@
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      blue:
+        condition: service_healthy
+      green:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://blue:80/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - ACTIVE_POOL=${ACTIVE_POOL}
+    networks:
+      - app-network
+
+  blue:
+    image: ${BLUE_IMAGE}
+    ports:
+      - "${BLUE_PORT:-8081}:8080"
+    environment:
+      - PORT=8080
+      - RELEASE_ID=${RELEASE_ID_BLUE}
+      - POOL=blue
+      - APP_POOL=blue
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - app-network
+
+  green:
+    image: ${GREEN_IMAGE}
+    ports:
+      - "${GREEN_PORT:-8082}:8080"
+    environment:
+      - PORT=8080
+      - RELEASE_ID=${RELEASE_ID_GREEN}
+      - POOL=green
+      - APP_POOL=green
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
